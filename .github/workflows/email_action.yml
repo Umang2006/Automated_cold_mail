@@ -1,0 +1,26 @@
+name: Send Internship Emails
+
+on:
+  schedule:
+    - cron: '51 2 * * *'  # Runs daily at 8:21 AM IST (2:51 AM UTC)
+
+jobs:
+  send_emails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create credentials.json
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credentials.json
+
+      - name: Run email script
+        run: python email_script.py

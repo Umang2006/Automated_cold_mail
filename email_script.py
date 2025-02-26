@@ -24,14 +24,23 @@ SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
 # Google Sheet Details
-SPREADSHEET_ID = "YOUR_SPREADSHEET_ID"
-RANGE_NAME = "Sheet1!A2:D11"  # Adjust based on your sheet structure
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+RANGE_NAME = "Sheet1!A2:E"  # Adjusted range to include Status column
 
 def fetch_professors():
-    """Fetch professors' data from Google Sheets"""
+    """Fetch professors' data from Google Sheets and filter only uncontacted ones."""
     sheet = service.spreadsheets()
     result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=RANGE_NAME).execute()
-    return result.get("values", [])
+    rows = result.get("values", [])
+
+    uncontacted_professors = []
+    for i, row in enumerate(rows):
+        if len(row) < 5 or row[4] != "Sent":  # If status column is empty, select this professor
+            uncontacted_professors.append((i + 2, row))  # Store row number (starting from 2)
+        if len(uncontacted_professors) == 10:
+            break  # Stop after selecting 10 professors
+
+    return uncontacted_professors
 
 def generate_email(professor):
     """Generate a personalized email using ChatGPT"""
@@ -57,11 +66,27 @@ def send_email(to_email, subject, body):
         server.login(EMAIL_USER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_USER, to_email, msg.as_string())
 
+def update_google_sheet(rows_sent):
+    """Mark professors as contacted in Google Sheets"""
+    sheet = service.spreadsheets()
+    status_range = f"Sheet1!E{rows_sent[0]}:E{rows_sent[-1]}"  # Mark Status column
+    values = [["Sent"]] * len(rows_sent)  # Fill 'Sent' status
+
+    body = {"values": values}
+    sheet.values().update(spreadsheetId=SPREADSHEET_ID, range=status_range, 
+                          valueInputOption="RAW", body=body).execute()
+
 def main():
     professors = fetch_professors()
-    for prof in professors:
+    rows_sent = []  # Store row numbers of emailed professors
+    
+    for row_num, prof in professors:
         email_body = generate_email(prof)
         send_email(prof[2], "Application for Summer Research Internship", email_body)
+        rows_sent.append(row_num)
+
+    if rows_sent:
+        update_google_sheet(rows_sent)
 
 if __name__ == "__main__":
     main()

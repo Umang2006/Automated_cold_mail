@@ -1,0 +1,6 @@
+google-auth
+gspread
+openai
+smtplib
+email
+schedule
